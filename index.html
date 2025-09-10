@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./index.css" />
+  <title>Karan's Portfolio</title>
+</head>
+
+<body>
+  <!-- Navbar -->
+  <div class="navbar">
+    <div class="right-nav">
+      <a href="">Project 1</a>
+      <a href="">Project 2</a>
+      <a href="">Project 3</a>
+      <a href="">Project 4</a>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main">
+    <div class="container">
+      <!-- Left Column -->
+      <div class="left-column">
+        <!-- About section -->
+        <div class="about">
+          <div class="about-text">
+            <p>
+              Hi, I'm Karan, a software engineer, part-time debugger, full-time internet resident.
+              If this site works, thank me. If it doesn't… blame <span class="js">JavaScript.</span><br>
+              I have an unhealthy obsession with cat memes and coding at 3 AM.
+            </p>
+          </div>
+        </div>
+
+        <!-- Projects -->
+        <div class="projects">
+          <div class="card">
+            <img src="https://via.placeholder.com/200x100" alt="Project 1 Screenshot">
+            <h3>Project 1</h3>
+            <p>Some old-school details here.</p>
+            <div class="card-links">
+              <a href="https://github.com/yourusername/project1" target="_blank">GitHub</a>
+              <a href="https://yourliveproject1.com" target="_blank">Live</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <img src="https://via.placeholder.com/200x100" alt="Project 2 Screenshot">
+            <h3>Project 2</h3>
+            <p>Just text. No effects.</p>
+            <div class="card-links">
+              <a href="https://github.com/yourusername/project2" target="_blank">GitHub</a>
+              <a href="https://yourliveproject2.com" target="_blank">Live</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <img src="https://via.placeholder.com/200x100" alt="Project 3 Screenshot">
+            <h3>Project 3</h3>
+            <p>Retro vibes only.</p>
+            <div class="card-links">
+              <a href="https://github.com/yourusername/project3" target="_blank">GitHub</a>
+              <a href="https://yourliveproject3.com" target="_blank">Live</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact -->
+        <div class="contact">
+          <p>
+            Wanna contact me? Drop me an email — I promise I check it more often than my fridge.
+          </p>
+
+          <div class="email-row">
+            <p class="email" id="email">
+              ikarn.dev@gmail.com <span class="hint">(click to copy)</span>
+            </p>
+            <p class="copy-msg" id="copy-msg">Email copied!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="right-column">
+        <div class="about-image">
+          <img src="./assets/memes/meme-1.jpeg" alt="Karan's profile picture">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    // Random image loader
+    const memeImages = [
+      './assets/memes/meme-1.jpeg',
+      './assets/memes/meme-2.jfif',
+      './assets/memes/meme-3.jpg',
+      './assets/memes/meme-4.jpg',
+      './assets/memes/meme-5.jfif',
+      './assets/memes/meme-6.jpeg'
+    ];
+
+    // Load random image on page load
+    window.addEventListener('load', () => {
+      const randomIndex = Math.floor(Math.random() * memeImages.length);
+      const randomImage = memeImages[randomIndex];
+      const imageElement = document.querySelector('.about-image img');
+      if (imageElement) {
+        imageElement.src = randomImage;
+      }
+    });
+
+    // Copy email to clipboard
+    const email = document.getElementById("email");
+    const copyMsg = document.getElementById("copy-msg");
+
+    email.addEventListener("click", () => {
+      navigator.clipboard.writeText("ikarn.dev@gmail.com").then(() => {
+        copyMsg.style.display = "block";
+        setTimeout(() => (copyMsg.style.display = "none"), 1500);
+      });
+    });
+  </script>
+
+</body>
+
+</html>
