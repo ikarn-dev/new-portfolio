@@ -64,10 +64,44 @@ function initThemeToggle() {
 }
 
 /**
+ * Project category filtering
+ */
+function initProjectFilters() {
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  const projectCards = document.querySelectorAll('.project-card');
+
+  if (!filterBtns.length || !projectCards.length) return;
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Remove active class from all buttons
+      filterBtns.forEach(b => b.classList.remove('active'));
+      // Add active class to clicked
+      btn.classList.add('active');
+
+      const filterValue = btn.getAttribute('data-filter');
+
+      projectCards.forEach(card => {
+        if (filterValue === 'all') {
+          card.classList.remove('hidden');
+        } else {
+          if (card.getAttribute('data-category') === filterValue) {
+            card.classList.remove('hidden');
+          } else {
+            card.classList.add('hidden');
+          }
+        }
+      });
+    });
+  });
+}
+
+/**
  * Boot
  */
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initMeme();
   initEmailCopy();
+  initProjectFilters();
 });
