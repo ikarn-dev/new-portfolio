@@ -1,0 +1,33 @@
+/* ── Font Faces ── */
+@font-face {
+  font-family: 'Quicksand';
+  src: url('../assets/fonts/Quicksand_Complete/Fonts/WEB/fonts/Quicksand-Variable.woff2') format('woff2'),
+       url('../assets/fonts/Quicksand_Complete/Fonts/WEB/fonts/Quicksand-Variable.woff') format('woff');
+  font-weight: 300 700;
+  font-display: optional;
+}
+
+@font-face {
+  font-family: 'Zodiak';
+  src: url('../assets/fonts/Zodiak_Complete/Fonts/WEB/fonts/Zodiak-Variable.woff2') format('woff2'),
+       url('../assets/fonts/Zodiak_Complete/Fonts/WEB/fonts/Zodiak-Variable.woff') format('woff');
+  font-weight: 100 900;
+  font-display: optional;
+}
+
+@font-face {
+  font-family: 'Zodiak';
+  src: url('../assets/fonts/Zodiak_Complete/Fonts/WEB/fonts/Zodiak-VariableItalic.woff2') format('woff2'),
+       url('../assets/fonts/Zodiak_Complete/Fonts/WEB/fonts/Zodiak-VariableItalic.woff') format('woff');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: optional;
+}
+
+@font-face {
+  font-family: 'Stardom';
+  src: url('../assets/fonts/Stardom_Complete/Fonts/WEB/fonts/Stardom-Regular.woff2') format('woff2'),
+       url('../assets/fonts/Stardom_Complete/Fonts/WEB/fonts/Stardom-Regular.woff') format('woff');
+  font-weight: 400;
+  font-display: optional;
+}

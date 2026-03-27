@@ -1,0 +1,53 @@
+/* ── Contact ── */
+.contact-section {
+  position: relative;
+}
+
+.contact-section p {
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.email-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.email-address {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--heading);
+}
+
+.copy-btn {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.copy-btn:hover {
+  border-color: var(--btn-hover-border);
+  color: var(--btn-hover-text);
+}
+
+.copy-btn:active {
+  background: var(--btn-active-bg);
+}
+
+.copy-msg {
+  display: none;
+  font-size: 0.8rem;
+  color: var(--copy-green);
+  margin-top: 6px;
+  font-weight: 500;
+  position: absolute;
+}

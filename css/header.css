@@ -1,0 +1,60 @@
+/* ── Header ── */
+.profile-photo {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  display: block;
+  margin: 0 auto 16px;
+  object-fit: cover;
+}
+
+h1 {
+  font-family: 'Stardom', 'Zodiak', serif;
+  font-size: 2.4rem;
+  font-weight: 400;
+  margin-bottom: 6px;
+  color: var(--heading);
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+h2.tagline {
+  font-family: 'Zodiak', serif;
+  font-size: 1.1rem;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+/* ── Social Icons ── */
+.social-icons {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.social-icons a {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  gap: 6px;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.social-icons a:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
+.social-icons svg {
+  width: 20px;
+  height: 20px;
+}

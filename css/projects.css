@@ -1,0 +1,64 @@
+/* ── Projects Grid ── */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.project-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+
+.project-card .project-title {
+  font-family: 'Zodiak', serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--heading);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.project-card .project-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  flex-grow: 1;
+}
+
+.project-card .project-links {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.project-card .project-links a {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+  display: inline-block;
+}
+
+.project-card .project-links a:hover {
+  border-color: var(--btn-hover-border);
+  color: var(--btn-hover-text);
+  text-decoration: none;
+}

@@ -1,0 +1,24 @@
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  body {
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  .projects-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .meme-section img {
+    max-width: 280px;
+  }
+}
+
+@media (max-width: 400px) {
+  .projects-grid {
+    grid-template-columns: 1fr;
+  }
+}
