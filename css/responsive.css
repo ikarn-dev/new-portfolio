@@ -5,7 +5,39 @@
   }
 
   h1 {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
+  }
+
+  h2.tagline {
+    font-size: 0.82rem;
+    text-wrap: balance;
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .section-label {
+    font-size: 0.7rem;
+  }
+
+  .about p {
+    font-size: 0.9rem;
+    line-height: 1.7;
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .header-links {
+    gap: 10px;
+  }
+
+  .header-links a {
+    font-size: 0.78rem;
+  }
+
+  .header-links svg,
+  .header-links img {
+    width: 16px;
+    height: 16px;
   }
 
   .projects-grid {
@@ -15,9 +47,58 @@
   .meme-section img {
     max-width: 280px;
   }
+
+  .heatmap-years {
+    gap: 6px;
+  }
+
+  .heatmap-years .filter-btn {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+  }
+
+  .heatmap-total {
+    font-size: 0.75rem;
+  }
+
+  .skills-grid {
+    padding-left: 0;
+  }
+
+  .skills-category {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .skills-category-label {
+    width: auto;
+    text-align: center;
+  }
+
+  .skills-list {
+    justify-content: center;
+  }
+
+  .skills-list span {
+    font-size: 0.72rem;
+    padding: 4px 10px;
+  }
 }
 
 @media (max-width: 400px) {
+  h1 {
+    font-size: 1.4rem;
+  }
+
+  h2.tagline {
+    font-size: 0.72rem;
+  }
+
+  .about p {
+    font-size: 0.84rem;
+  }
+
   .projects-grid {
     grid-template-columns: 1fr;
   }

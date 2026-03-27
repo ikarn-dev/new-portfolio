@@ -26,18 +26,20 @@ h2.tagline {
   color: var(--text-muted);
   margin-bottom: 16px;
   text-align: center;
+  text-wrap: balance;
 }
 
-/* ── Social Icons ── */
-.social-icons {
+/* ── Header Links ── */
+.header-links {
   display: flex;
   gap: 14px;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   margin-bottom: 24px;
 }
 
-.social-icons a {
+.header-links a {
   display: flex;
   align-items: center;
   text-decoration: none;
@@ -49,12 +51,14 @@ h2.tagline {
   transition: opacity 0.15s;
 }
 
-.social-icons a:hover {
+.header-links a:hover {
   opacity: 1;
   text-decoration: none;
 }
 
-.social-icons svg {
+.header-links svg,
+.header-links img {
   width: 20px;
   height: 20px;
+  flex-shrink: 0;
 }
