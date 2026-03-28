@@ -16,11 +16,19 @@ var componentMap = [
   { id: 'comp-contact',       path: './components/contact.html' },
   { id: 'comp-footer',        path: './components/footer.html' }
 ];
+var COMPONENT_VERSION = (function () {
+  var script = document.currentScript;
+  if (!script) return String(Date.now());
+
+  try {
+    return new URL(script.src, window.location.href).searchParams.get('v') || String(Date.now());
+  } catch (_) {
+    return String(Date.now());
+  }
+})();
 
 function loadComponent(entry) {
-  // Add a timestamp query parameter to forcefully bypass browser caches
-  var url = entry.path + '?v=' + new Date().getTime();
-  return fetch(url, { cache: 'no-store' })
+  return fetch(entry.path + '?v=' + encodeURIComponent(COMPONENT_VERSION), { cache: 'no-store' })
     .then(function (res) {
       if (!res.ok) throw new Error('Failed to load ' + entry.path);
       return res.text();
@@ -28,9 +36,15 @@ function loadComponent(entry) {
     .then(function (html) {
       var el = document.getElementById(entry.id);
       if (el) el.innerHTML = html;
+      return { id: entry.id, ok: true };
     })
-    .catch(function () {
-      // Silent fail
+    .catch(function (err) {
+      var el = document.getElementById(entry.id);
+      if (el) {
+        el.innerHTML = '<p class="component-fallback" role="status">Unable to load this section.</p>';
+      }
+      console.error(err);
+      return { id: entry.id, ok: false };
     });
 }
 

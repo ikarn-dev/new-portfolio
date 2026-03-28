@@ -42,12 +42,3 @@
 .copy-btn:active {
   background: var(--btn-active-bg);
 }
-
-.copy-msg {
-  display: none;
-  font-size: 0.8rem;
-  color: var(--copy-green);
-  margin-top: 6px;
-  font-weight: 500;
-  position: absolute;
-}

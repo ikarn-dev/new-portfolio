@@ -1,9 +1,9 @@
 {
-  "redirects": [
-    { "source": "/components/:path*", "destination": "/", "permanent": false },
-    { "source": "/js/:path*", "destination": "/", "permanent": false },
-    { "source": "/css/:path*", "destination": "/", "permanent": false }
-  ],
+  "functions": {
+    "api/contributions.js": {
+      "maxDuration": 10
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",

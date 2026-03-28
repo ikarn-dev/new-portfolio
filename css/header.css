@@ -51,6 +51,10 @@ h2.tagline {
   transition: opacity 0.15s;
 }
 
+.header-links a.icon-only {
+  gap: 0;
+}
+
 .header-links a:hover {
   opacity: 1;
   text-decoration: none;
@@ -61,4 +65,12 @@ h2.tagline {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
+}
+
+.header-links img.icon-monochrome {
+  opacity: 0.95;
+}
+
+[data-theme="dark"] .header-links img.icon-monochrome {
+  filter: brightness(0) invert(0.78);
 }

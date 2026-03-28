@@ -21,14 +21,23 @@ function initMeme() {
  */
 function initEmailCopy() {
   var btn = document.getElementById('copy-btn');
+  var status = document.getElementById('copy-status');
   if (!btn) return;
 
   btn.addEventListener('click', function () {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      if (status) status.textContent = 'Clipboard copy is not available in this browser.';
+      return;
+    }
+
     navigator.clipboard.writeText('ikarn.dev@gmail.com').then(function () {
       btn.textContent = 'copied!';
+      if (status) status.textContent = 'Email address copied to clipboard.';
       setTimeout(function () {
         btn.textContent = 'copy';
       }, 1500);
+    }).catch(function () {
+      if (status) status.textContent = 'Unable to copy email address.';
     });
   });
 }
@@ -100,11 +109,10 @@ function initProjectFilters() {
  * - Caches in sessionStorage (1 hour TTL)
  * - Smart tooltip positioning to avoid edge cropping
  */
+var heatmapState = { activeYear: null, requestId: 0 };
+var CACHE_TTL = 3600000;
 var GITHUB_LOGIN = 'ikarn-dev';
 var LEVEL_MAP = { NONE: 0, FIRST_QUARTILE: 1, SECOND_QUARTILE: 2, THIRD_QUARTILE: 3, FOURTH_QUARTILE: 4 };
-var heatmapState = { activeYear: null };
-var CACHE_TTL = 3600000;
-
 var CONTRIBUTIONS_QUERY = [
   'query($login: String!, $from: DateTime!, $to: DateTime!) {',
   '  user(login: $login) {',
@@ -121,6 +129,7 @@ var CONTRIBUTIONS_QUERY = [
   '  }',
   '}'
 ].join('\n');
+var twitterScriptPromise = null;
 
 function getCacheKey(year) { return 'gh_contrib_' + year; }
 
@@ -146,63 +155,123 @@ function setCachedData(year, data) {
   } catch (_) { /* silently ignore */ }
 }
 
-function fetchContributions(year) {
-  if (typeof GITHUB_TOKEN === 'undefined' || !GITHUB_TOKEN) {
-    return Promise.reject(new Error('no token'));
-  }
-  var cached = getCachedData(year);
-  if (cached) return Promise.resolve(cached);
+function isLocalPreview() {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
 
+function getLocalGitHubToken() {
+  if (typeof window.GITHUB_TOKEN === 'string' && window.GITHUB_TOKEN) {
+    return window.GITHUB_TOKEN;
+  }
+
+  try {
+    return localStorage.getItem('github_token') || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function normalizeContributionData(json) {
+  var collection = json.data.user.contributionsCollection;
+  var calendar = collection.contributionCalendar;
+
+  return {
+    totalContributions: calendar.totalContributions,
+    weeks: calendar.weeks.map(function (week) {
+      return week.contributionDays.map(function (day) {
+        return {
+          count: day.contributionCount,
+          level: LEVEL_MAP[day.contributionLevel] || 0,
+          date: day.date
+        };
+      });
+    }),
+    stats: {
+      commits: collection.totalCommitContributions,
+      pullRequests: collection.totalPullRequestContributions,
+      reviews: collection.totalPullRequestReviewContributions,
+      issues: collection.totalIssueContributions
+    }
+  };
+}
+
+function fetchServerContributions(year) {
+  return fetch('/api/contributions?year=' + year, {
+    headers: {
+      'Accept': 'application/json'
+    }
+  })
+    .then(function (res) {
+      if (!res.ok) {
+        var err = new Error('API error');
+        err.status = res.status;
+        throw err;
+      }
+      return res.json();
+    });
+}
+
+function fetchBrowserContributions(year, token) {
   var from = year + '-01-01T00:00:00Z';
   var to = year + '-12-31T23:59:59Z';
 
   return fetch('https://api.github.com/graphql', {
     method: 'POST',
     headers: {
-      'Authorization': 'Bearer ' + GITHUB_TOKEN,
+      'Authorization': 'Bearer ' + token,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
       query: CONTRIBUTIONS_QUERY,
-      variables: { login: GITHUB_LOGIN, from: from, to: to }
+      variables: {
+        login: GITHUB_LOGIN,
+        from: from,
+        to: to
+      }
     })
   })
     .then(function (res) {
-      if (!res.ok) throw new Error('API error');
+      if (!res.ok) {
+        var err = new Error('GitHub API error');
+        err.status = res.status;
+        throw err;
+      }
       return res.json();
     })
     .then(function (json) {
-      if (json.errors) throw new Error('query error');
-      var collection = json.data.user.contributionsCollection;
-      var calendar = collection.contributionCalendar;
-      var data = {
-        totalContributions: calendar.totalContributions,
-        weeks: calendar.weeks.map(function (week) {
-          return week.contributionDays.map(function (day) {
-            return {
-              count: day.contributionCount,
-              level: LEVEL_MAP[day.contributionLevel] || 0,
-              date: day.date
-            };
-          });
-        }),
-        stats: {
-          commits: collection.totalCommitContributions,
-          pullRequests: collection.totalPullRequestContributions,
-          reviews: collection.totalPullRequestReviewContributions,
-          issues: collection.totalIssueContributions
+      if (json.errors || !json.data || !json.data.user) {
+        throw new Error('GitHub query error');
+      }
+      return normalizeContributionData(json);
+    });
+}
+
+function fetchContributions(year) {
+  var cached = getCachedData(year);
+  if (cached) return Promise.resolve(cached);
+
+  return fetchServerContributions(year)
+    .catch(function (err) {
+      if ((err.status === 404 || err.status === 503) && isLocalPreview()) {
+        var token = getLocalGitHubToken();
+        if (token) {
+          return fetchBrowserContributions(year, token);
         }
-      };
-      setCachedData(year, data);
-      return data;
+        err.code = 'local_preview_needs_token';
+      }
+      throw err;
+    })
+    .then(function (json) {
+      setCachedData(year, json);
+      return json;
     });
 }
 
 /* Prefetch — fires immediately on script load, before DOM ready */
 (function () {
   var y = new Date().getFullYear();
-  if (typeof GITHUB_TOKEN !== 'undefined' && GITHUB_TOKEN && !getCachedData(y)) {
-    fetchContributions(y);
+  if (!getCachedData(y)) {
+    fetchContributions(y).catch(function () {});
   }
 })();
 
@@ -210,11 +279,6 @@ function initGitHubHeatmap() {
   var container = document.getElementById('github-heatmap');
   var yearsContainer = document.getElementById('heatmap-years');
   if (!container || !yearsContainer) return;
-
-  if (typeof GITHUB_TOKEN === 'undefined' || !GITHUB_TOKEN) {
-    container.innerHTML = '<div class="heatmap-loading">missing config</div>';
-    return;
-  }
 
   var startYear = 2022;
   var currentYear = new Date().getFullYear();
@@ -246,25 +310,160 @@ function setActiveYearBtn(year) {
   });
 }
 
+function setHeatmapYearButtonsDisabled(disabled) {
+  var btns = document.querySelectorAll('#heatmap-years .filter-btn');
+  btns.forEach(function (btn) {
+    btn.disabled = disabled;
+  });
+}
+
+function setHeatmapPanelState(mode, message) {
+  var panel = document.getElementById('heatmap-panel');
+  var status = document.getElementById('heatmap-status');
+  if (!panel || !status) return;
+
+  panel.classList.remove('is-loading', 'is-error');
+
+  if (!mode) {
+    status.hidden = true;
+    status.textContent = '';
+    panel.setAttribute('aria-busy', 'false');
+    return;
+  }
+
+  panel.classList.add(mode === 'loading' ? 'is-loading' : 'is-error');
+  panel.setAttribute('aria-busy', mode === 'loading' ? 'true' : 'false');
+  status.textContent = message || '';
+  status.hidden = false;
+}
+
 function loadContributions(year) {
   var container = document.getElementById('github-heatmap');
   var totalEl = document.getElementById('heatmap-total');
   var statsEl = document.getElementById('heatmap-stats');
   if (!container) return;
 
-  container.innerHTML = '<div class="heatmap-loading">loading...</div>';
-  if (totalEl) totalEl.textContent = '';
-  if (statsEl) statsEl.innerHTML = '';
+  var requestId = ++heatmapState.requestId;
+  setHeatmapYearButtonsDisabled(true);
+  setHeatmapPanelState('loading', 'Loading ' + year + ' contributions...');
+
+  if (!container.children.length) {
+    container.innerHTML = '<div class="heatmap-loading">loading...</div>';
+  }
+
+  if (statsEl && !statsEl.children.length) {
+    renderStats({
+      commits: 0,
+      pullRequests: 0,
+      reviews: 0,
+      issues: 0
+    }, statsEl);
+  }
 
   fetchContributions(year)
     .then(function (data) {
+      if (requestId !== heatmapState.requestId) return;
+
       renderHeatmap(data, container);
       if (totalEl) totalEl.textContent = data.totalContributions + ' contributions in ' + year;
       if (statsEl && data.stats) renderStats(data.stats, statsEl);
+      setHeatmapPanelState(null);
+      setHeatmapYearButtonsDisabled(false);
     })
-    .catch(function () {
-      container.innerHTML = '<div class="heatmap-loading">unable to load</div>';
+    .catch(function (err) {
+      if (requestId !== heatmapState.requestId) return;
+
+      var message = err.status === 503 ? 'missing config' : 'unable to load';
+
+      if (err.code === 'local_preview_needs_token') {
+        message = 'run with vercel dev or set localStorage.github_token';
+      }
+
+      if (!container.querySelector('.heatmap-cell')) {
+        container.innerHTML = '<div class="heatmap-loading">' + message + '</div>';
+        setHeatmapPanelState('error', message);
+        setHeatmapYearButtonsDisabled(false);
+        return;
+      }
+
+      setHeatmapPanelState('error', message);
+      setHeatmapYearButtonsDisabled(false);
     });
+}
+
+function initSkillsLayout() {
+  var wrap = document.querySelector('.skills-grid-wrap');
+  var grid = wrap && wrap.querySelector('.skills-grid');
+  if (!wrap || !grid) return;
+
+  function applySkillsScale() {
+    grid.style.transform = '';
+    grid.style.transformOrigin = '';
+    wrap.style.height = '';
+    wrap.style.overflow = '';
+
+    if (window.innerWidth > 600) return;
+
+    var availableWidth = wrap.clientWidth;
+    var naturalWidth = grid.scrollWidth;
+    var naturalHeight = grid.scrollHeight;
+
+    if (!availableWidth || !naturalWidth) return;
+
+    var scale = Math.min(1, availableWidth / naturalWidth);
+
+    if (scale < 1) {
+      grid.style.transform = 'scale(' + scale + ')';
+      grid.style.transformOrigin = 'top center';
+      wrap.style.height = Math.ceil(naturalHeight * scale) + 'px';
+      wrap.style.overflow = 'hidden';
+    }
+  }
+
+  applySkillsScale();
+  window.addEventListener('resize', applySkillsScale);
+}
+
+function initTwitterEmbeds() {
+  var target = document.querySelector('.achievement-tweet');
+  if (!target) return;
+
+  function hydrateTwitter() {
+    if (window.twttr && window.twttr.widgets && typeof window.twttr.widgets.load === 'function') {
+      window.twttr.widgets.load(target);
+    }
+  }
+
+  if (window.twttr && typeof window.twttr.ready === 'function') {
+    window.twttr.ready(function () {
+      hydrateTwitter();
+    });
+    return;
+  }
+
+  if (!twitterScriptPromise) {
+    twitterScriptPromise = new Promise(function (resolve, reject) {
+      var script = document.createElement('script');
+      script.src = 'https://platform.twitter.com/widgets.js';
+      script.async = true;
+      script.charset = 'utf-8';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+  }
+
+  twitterScriptPromise
+    .then(function () {
+      if (window.twttr && typeof window.twttr.ready === 'function') {
+        window.twttr.ready(function () {
+          hydrateTwitter();
+        });
+        return;
+      }
+      hydrateTwitter();
+    })
+    .catch(function () {});
 }
 
 function renderStats(stats, container) {
@@ -292,69 +491,63 @@ function renderHeatmap(data, container) {
     return;
   }
 
-  // Month labels
   var monthsEl = document.getElementById('heatmap-months');
+  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
   if (monthsEl) {
     monthsEl.innerHTML = '';
-    var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var lastMonth = -1;
-    data.weeks.forEach(function (week, wi) {
-      var fd = week[0];
-      if (fd) {
-        var m = parseInt(fd.date.split('-')[1], 10) - 1;
-        if (m !== lastMonth) {
-          var span = document.createElement('span');
-          span.className = 'heatmap-month-label';
-          span.textContent = monthNames[m];
-          span.style.gridColumnStart = wi + 1;
-          monthsEl.appendChild(span);
-          lastMonth = m;
-        }
-      }
-    });
   }
 
-  // Cells with month separators and smart tooltips
   var totalWeeks = data.weeks.length;
   var prevMonth = -1;
 
   data.weeks.forEach(function (week, wi) {
-    // Detect month boundary for separator
     var firstDay = week[0];
-    var isNewMonth = false;
-    if (firstDay) {
-      var curMonth = parseInt(firstDay.date.split('-')[1], 10);
-      if (curMonth !== prevMonth) {
-        isNewMonth = prevMonth !== -1; // don't add gap before first month
-        prevMonth = curMonth;
+    var currentMonth = firstDay ? parseInt(firstDay.date.split('-')[1], 10) : prevMonth;
+    var isNewMonth = currentMonth !== prevMonth;
+    var needsMonthGap = wi > 0 && isNewMonth;
+
+    if (monthsEl) {
+      var monthSlot = document.createElement('div');
+      monthSlot.className = 'heatmap-month-slot';
+      if (needsMonthGap) monthSlot.classList.add('month-start');
+
+      if (isNewMonth && currentMonth > 0) {
+        var label = document.createElement('span');
+        label.className = 'heatmap-month-label';
+        label.textContent = monthNames[currentMonth - 1];
+        monthSlot.appendChild(label);
       }
+
+      monthsEl.appendChild(monthSlot);
     }
+
+    var weekEl = document.createElement('div');
+    weekEl.className = 'heatmap-week';
+    if (needsMonthGap) weekEl.classList.add('month-start');
 
     week.forEach(function (day, di) {
       var cell = document.createElement('div');
       cell.className = 'heatmap-cell';
       cell.setAttribute('data-level', day.level);
 
-      // Short tooltip: "3 · Mar 27"
       var parts = day.date.split('-');
-      var monthAbbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var monthAbbr = monthNames;
       var shortDate = monthAbbr[parseInt(parts[1], 10) - 1] + ' ' + parseInt(parts[2], 10);
       cell.setAttribute('data-tooltip', day.count + ' · ' + shortDate);
 
-      // Month separator — add gap on first cell of new month column
-      if (isNewMonth && di === 0) cell.classList.add('month-start');
-
-      // Smart tooltip positioning
       if (wi < 4) cell.classList.add('tooltip-right');
       else if (wi > totalWeeks - 4) cell.classList.add('tooltip-left');
       if (di <= 1) cell.classList.add('tooltip-below');
       else if (di >= 5) cell.classList.add('tooltip-above');
 
-      container.appendChild(cell);
+      weekEl.appendChild(cell);
     });
+
+    container.appendChild(weekEl);
+    prevMonth = currentMonth;
   });
 
-  // Scroll to Jan (start) — not Dec
   var scrollArea = container.closest('.heatmap-scroll-area');
   if (scrollArea) scrollArea.scrollLeft = 0;
 }
@@ -366,11 +559,8 @@ document.addEventListener('components-loaded', function () {
   initThemeToggle();
   initMeme();
   initEmailCopy();
+  initSkillsLayout();
   initProjectFilters();
   initGitHubHeatmap();
-
-  // Re-render Twitter embeds after dynamic injection
-  if (window.twttr && window.twttr.widgets) {
-    window.twttr.widgets.load();
-  }
+  initTwitterEmbeds();
 });

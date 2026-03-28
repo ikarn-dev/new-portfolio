@@ -55,34 +55,65 @@
   .heatmap-years .filter-btn {
     font-size: 0.7rem;
     padding: 4px 10px;
+    min-width: 68px;
   }
 
   .heatmap-total {
     font-size: 0.75rem;
   }
 
+  .heatmap-panel {
+    padding: 14px 12px 12px;
+    border-radius: 20px;
+  }
+
+  .heatmap-outer {
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .heatmap-stats {
+    gap: 8px;
+    min-height: 72px;
+  }
+
+  .heatmap-stat-item {
+    min-width: 74px;
+    padding: 8px 10px;
+  }
+
+  .heatmap-stat-value {
+    font-size: 0.96rem;
+  }
+
+  .heatmap-stat-label {
+    font-size: 0.58rem;
+  }
+
   .skills-grid {
-    padding-left: 0;
+    gap: 8px;
+    padding-left: 28px;
   }
 
   .skills-category {
-    flex-direction: column;
-    align-items: center;
     gap: 8px;
   }
 
   .skills-category-label {
-    width: auto;
-    text-align: center;
+    width: 98px;
+    font-size: 0.5rem;
+    letter-spacing: 0.04em;
+    padding-top: 3px;
   }
 
   .skills-list {
-    justify-content: center;
+    gap: 4px;
   }
 
   .skills-list span {
-    font-size: 0.72rem;
-    padding: 4px 10px;
+    font-size: 0.5rem;
+    padding: 2px 6px;
+    white-space: nowrap;
   }
 }
 
@@ -101,5 +132,33 @@
 
   .projects-grid {
     grid-template-columns: 1fr;
+  }
+
+  .skills-grid {
+    padding-left: 18px;
+  }
+
+  .skills-category-label {
+    width: 82px;
+    font-size: 0.44rem;
+    letter-spacing: 0.03em;
+  }
+
+  .skills-list {
+    gap: 3px;
+  }
+
+  .skills-list span {
+    font-size: 0.44rem;
+    padding: 2px 5px;
+  }
+
+  .heatmap-panel {
+    padding: 12px 10px 10px;
+  }
+
+  .heatmap-stat-item {
+    min-width: 68px;
+    padding: 7px 9px;
   }
 }
