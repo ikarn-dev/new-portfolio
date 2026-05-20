@@ -1,22 +1,4 @@
 /**
- * Random meme on page load
- */
-function initMeme() {
-  var memeImages = [
-    './assets/memes/meme-1.jpeg',
-    './assets/memes/meme-2.jfif',
-    './assets/memes/meme-3.jpg',
-    './assets/memes/meme-4.jpg',
-    './assets/memes/meme-5.jfif',
-    './assets/memes/meme-6.jpeg'
-  ];
-  var el = document.getElementById('meme-img');
-  if (el) {
-    el.src = memeImages[Math.floor(Math.random() * memeImages.length)];
-  }
-}
-
-/**
  * Click-to-copy email
  */
 function initEmailCopy() {
@@ -59,6 +41,7 @@ function initThemeToggle() {
   }
 
   toggle.addEventListener('click', function () {
+    document.body.classList.add('theme-transitioning');
     var current = document.documentElement.getAttribute('data-theme');
     if (current === 'dark') {
       document.documentElement.removeAttribute('data-theme');
@@ -69,6 +52,9 @@ function initThemeToggle() {
       toggle.textContent = 'light';
       localStorage.setItem('theme', 'dark');
     }
+    setTimeout(function () {
+      document.body.classList.remove('theme-transitioning');
+    }, 350);
   });
 }
 
@@ -277,45 +263,12 @@ function fetchContributions(year) {
 
 function initGitHubHeatmap() {
   var container = document.getElementById('github-heatmap');
-  var yearsContainer = document.getElementById('heatmap-years');
-  if (!container || !yearsContainer) return;
+  if (!container) return;
 
-  var startYear = 2022;
   var currentYear = new Date().getFullYear();
-  var years = [];
-  for (var y = currentYear; y >= startYear; y--) { years.push(y); }
-
-  yearsContainer.innerHTML = '';
-  years.forEach(function (year) {
-    var btn = document.createElement('button');
-    btn.className = 'filter-btn';
-    btn.textContent = year;
-    btn.setAttribute('data-year', year);
-    btn.addEventListener('click', function () {
-      loadContributions(year);
-      setActiveYearBtn(year);
-    });
-    yearsContainer.appendChild(btn);
-  });
-
   loadContributions(currentYear);
-  setActiveYearBtn(currentYear);
 }
 
-function setActiveYearBtn(year) {
-  heatmapState.activeYear = year;
-  var btns = document.querySelectorAll('#heatmap-years .filter-btn');
-  btns.forEach(function (b) {
-    b.classList.toggle('active', parseInt(b.getAttribute('data-year'), 10) === year);
-  });
-}
-
-function setHeatmapYearButtonsDisabled(disabled) {
-  var btns = document.querySelectorAll('#heatmap-years .filter-btn');
-  btns.forEach(function (btn) {
-    btn.disabled = disabled;
-  });
-}
 
 function setHeatmapPanelState(mode, message) {
   var panel = document.getElementById('heatmap-panel');
@@ -339,13 +292,11 @@ function setHeatmapPanelState(mode, message) {
 
 function loadContributions(year) {
   var container = document.getElementById('github-heatmap');
-  var totalEl = document.getElementById('heatmap-total');
   var statsEl = document.getElementById('heatmap-stats');
   if (!container) return;
 
   var requestId = ++heatmapState.requestId;
-  setHeatmapYearButtonsDisabled(true);
-  setHeatmapPanelState('loading', 'Loading ' + year + ' contributions...');
+  setHeatmapPanelState('loading', 'Loading contributions...');
 
   if (!container.children.length) {
     container.innerHTML = '<div class="heatmap-loading">loading...</div>';
@@ -365,10 +316,8 @@ function loadContributions(year) {
       if (requestId !== heatmapState.requestId) return;
 
       renderHeatmap(data, container);
-      if (totalEl) totalEl.textContent = data.totalContributions + ' contributions in ' + year;
       if (statsEl && data.stats) renderStats(data.stats, statsEl);
       setHeatmapPanelState(null);
-      setHeatmapYearButtonsDisabled(false);
     })
     .catch(function (err) {
       if (requestId !== heatmapState.requestId) return;
@@ -382,12 +331,10 @@ function loadContributions(year) {
       if (!container.querySelector('.heatmap-cell')) {
         container.innerHTML = '<div class="heatmap-loading">' + message + '</div>';
         setHeatmapPanelState('error', message);
-        setHeatmapYearButtonsDisabled(false);
         return;
       }
 
       setHeatmapPanelState('error', message);
-      setHeatmapYearButtonsDisabled(false);
     });
 }
 
@@ -553,14 +500,278 @@ function renderHeatmap(data, container) {
 }
 
 /**
+ * Relative time helper
+ */
+function timeAgo(isoDate) {
+  var seconds = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  var minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes + (minutes === 1 ? ' minute ago' : ' minutes ago');
+  var hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+  var days = Math.floor(hours / 24);
+  if (days < 30) return days + (days === 1 ? ' day ago' : ' days ago');
+  var months = Math.floor(days / 30);
+  return months + (months === 1 ? ' month ago' : ' months ago');
+}
+
+/**
+ * GitHub Activity — last commit, total commits, recent repos
+ */
+var ACTIVITY_CACHE_KEY = 'gh_activity';
+var ACTIVITY_CACHE_TTL = 1800000; // 30 minutes
+
+var ACTIVITY_QUERY = [
+  'query($login: String!) {',
+  '  user(login: $login) {',
+  '    contributionsCollection {',
+  '      contributionCalendar { totalContributions }',
+  '      totalCommitContributions',
+  '    }',
+  '    repositories(first: 6, orderBy: {field: PUSHED_AT, direction: DESC}, ownerAffiliations: OWNER, isFork: false, privacy: PUBLIC) {',
+  '      nodes {',
+  '        name',
+  '        nameWithOwner',
+  '        description',
+  '        url',
+  '        pushedAt',
+  '        primaryLanguage { name color }',
+  '        stargazerCount',
+  '      }',
+  '    }',
+  '    pinnedItems(first: 6, types: REPOSITORY) {',
+  '      nodes {',
+  '        ... on Repository {',
+  '          name',
+  '          nameWithOwner',
+  '          description',
+  '          url',
+  '          pushedAt',
+  '          primaryLanguage { name color }',
+  '          stargazerCount',
+  '        }',
+  '      }',
+  '    }',
+  '  }',
+  '}'
+].join('\n');
+
+function getCachedActivity() {
+  try {
+    var raw = sessionStorage.getItem(ACTIVITY_CACHE_KEY);
+    if (!raw) return null;
+    var cached = JSON.parse(raw);
+    if (Date.now() - cached.timestamp > ACTIVITY_CACHE_TTL) {
+      sessionStorage.removeItem(ACTIVITY_CACHE_KEY);
+      return null;
+    }
+    return cached.data;
+  } catch (_) { return null; }
+}
+
+function setCachedActivity(data) {
+  try {
+    sessionStorage.setItem(ACTIVITY_CACHE_KEY, JSON.stringify({
+      timestamp: Date.now(),
+      data: data
+    }));
+  } catch (_) { /* silently ignore */ }
+}
+
+function fetchActivityFromServer() {
+  return fetch('/api/activity', {
+    headers: { 'Accept': 'application/json' }
+  })
+    .then(function (res) {
+      if (!res.ok) {
+        var err = new Error('API error');
+        err.status = res.status;
+        throw err;
+      }
+      return res.json();
+    });
+}
+
+function fetchActivityFromBrowser(token) {
+  return fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      query: ACTIVITY_QUERY,
+      variables: { login: GITHUB_LOGIN }
+    })
+  })
+    .then(function (res) {
+      if (!res.ok) throw new Error('GitHub API error');
+      return res.json();
+    })
+    .then(function (json) {
+      if (json.errors || !json.data || !json.data.user) throw new Error('GitHub query error');
+      var user = json.data.user;
+      var recentRepos = user.repositories.nodes || [];
+      var pinnedRepos = user.pinnedItems.nodes || [];
+      var displayRepos = pinnedRepos.length > 0 ? pinnedRepos : recentRepos;
+
+      return {
+        lastCommit: recentRepos.length > 0 ? recentRepos[0].pushedAt : null,
+        totalCommits: user.contributionsCollection.totalCommitContributions,
+        totalContributions: user.contributionsCollection.contributionCalendar.totalContributions,
+        repos: displayRepos.map(function (repo) {
+          return {
+            name: repo.name,
+            fullName: repo.nameWithOwner,
+            description: repo.description || '',
+            url: repo.url,
+            language: repo.primaryLanguage ? repo.primaryLanguage.name : null,
+            languageColor: repo.primaryLanguage ? repo.primaryLanguage.color : null,
+            stars: repo.stargazerCount,
+            pushedAt: repo.pushedAt
+          };
+        })
+      };
+    });
+}
+
+function fetchActivity() {
+  var cached = getCachedActivity();
+  if (cached) return Promise.resolve(cached);
+
+  return fetchActivityFromServer()
+    .catch(function (err) {
+      if ((err.status === 404 || err.status === 503) && isLocalPreview()) {
+        var token = getLocalGitHubToken();
+        if (token) return fetchActivityFromBrowser(token);
+      }
+      throw err;
+    })
+    .then(function (data) {
+      setCachedActivity(data);
+      return data;
+    });
+}
+
+function renderActivityRepos(repos, container) {
+  container.innerHTML = '';
+  repos.forEach(function (repo) {
+    var a = document.createElement('a');
+    a.className = 'activity-repo';
+    a.href = repo.url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+
+    var prefix = document.createElement('span');
+    prefix.className = 'activity-repo-prefix';
+    prefix.textContent = '>';
+    a.appendChild(prefix);
+
+    var name = document.createElement('span');
+    name.className = 'activity-repo-name';
+    name.textContent = repo.fullName || repo.name;
+    a.appendChild(name);
+
+    if (repo.language) {
+      var lang = document.createElement('span');
+      lang.className = 'activity-repo-lang';
+      lang.textContent = '[' + repo.language + ']';
+      a.appendChild(lang);
+    }
+
+    if (repo.description) {
+      var desc = document.createElement('span');
+      desc.className = 'activity-repo-desc';
+      desc.textContent = '— ' + repo.description;
+      a.appendChild(desc);
+    }
+
+    container.appendChild(a);
+  });
+}
+
+function initGitHubActivity() {
+  var lastCommitEl = document.getElementById('activity-last-commit');
+  var totalCommitsEl = document.getElementById('activity-total-commits');
+  var reposContainer = document.getElementById('activity-repos');
+
+  if (!lastCommitEl && !totalCommitsEl && !reposContainer) return;
+
+  fetchActivity()
+    .then(function (data) {
+      if (lastCommitEl && data.lastCommit) {
+        lastCommitEl.textContent = timeAgo(data.lastCommit);
+      } else if (lastCommitEl) {
+        lastCommitEl.textContent = '—';
+      }
+
+      if (totalCommitsEl) {
+        totalCommitsEl.textContent = data.totalContributions || data.totalCommits || '—';
+      }
+
+      if (reposContainer && data.repos && data.repos.length) {
+        renderActivityRepos(data.repos, reposContainer);
+      }
+    })
+    .catch(function () {
+      if (lastCommitEl) lastCommitEl.textContent = '—';
+      if (totalCommitsEl) totalCommitsEl.textContent = '—';
+    });
+}
+
+/* Prefetch activity data — fires immediately */
+(function () {
+  if (!getCachedActivity()) {
+    fetchActivity().catch(function () {});
+  }
+})();
+
+/**
+ * Heatmap scroll buttons
+ */
+function initHeatmapScroll() {
+  var scrollArea = document.getElementById('heatmap-scroll-area');
+  var leftBtn = document.getElementById('heatmap-scroll-left');
+  var rightBtn = document.getElementById('heatmap-scroll-right');
+  if (!scrollArea || !leftBtn || !rightBtn) return;
+
+  var scrollStep = 200;
+
+  function updateButtons() {
+    leftBtn.disabled = scrollArea.scrollLeft <= 0;
+    rightBtn.disabled = scrollArea.scrollLeft >= scrollArea.scrollWidth - scrollArea.clientWidth - 1;
+  }
+
+  leftBtn.addEventListener('click', function () {
+    scrollArea.scrollBy({ left: -scrollStep, behavior: 'smooth' });
+  });
+
+  rightBtn.addEventListener('click', function () {
+    scrollArea.scrollBy({ left: scrollStep, behavior: 'smooth' });
+  });
+
+  scrollArea.addEventListener('scroll', updateButtons, { passive: true });
+
+  // Initial state — defer slightly so heatmap has rendered
+  setTimeout(updateButtons, 500);
+
+  // Also update when heatmap renders
+  var observer = new MutationObserver(function () {
+    setTimeout(updateButtons, 50);
+  });
+  observer.observe(scrollArea, { childList: true, subtree: true });
+}
+
+/**
  * Boot
  */
 document.addEventListener('components-loaded', function () {
   initThemeToggle();
-  initMeme();
   initEmailCopy();
   initSkillsLayout();
   initProjectFilters();
   initGitHubHeatmap();
+  initHeatmapScroll();
+  initGitHubActivity();
   initTwitterEmbeds();
 });

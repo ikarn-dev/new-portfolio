@@ -48,8 +48,9 @@ var MIME_TYPES = {
   '.webm': 'video/webm'
 };
 
-// Import the serverless function handler
+// Import the serverless function handlers
 var contributionsHandler = require('./api/contributions');
+var activityHandler = require('./api/activity');
 
 function createMockRes(httpRes) {
   var statusCode = 200;
@@ -86,6 +87,19 @@ var server = http.createServer(function (req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
 
     contributionsHandler(mockReq, mockRes);
+    return;
+  }
+
+  // Handle Activity API route
+  if (pathname === '/api/activity') {
+    var activityQuery = {};
+    reqUrl.searchParams.forEach(function (value, key) { activityQuery[key] = value; });
+    var activityMockReq = { query: activityQuery };
+    var activityMockRes = createMockRes(res);
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    activityHandler(activityMockReq, activityMockRes);
     return;
   }
 

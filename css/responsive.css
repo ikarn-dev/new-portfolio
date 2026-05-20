@@ -48,18 +48,46 @@
     max-width: 280px;
   }
 
-  .heatmap-years {
-    gap: 6px;
+  .activity-panel {
+    grid-template-columns: 1fr;
+    border-radius: 10px;
   }
 
-  .heatmap-years .filter-btn {
-    font-size: 0.7rem;
-    padding: 4px 10px;
-    min-width: 68px;
+  .activity-summary {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 12px 14px;
   }
 
-  .heatmap-total {
-    font-size: 0.75rem;
+  .activity-repos {
+    padding: 10px 14px;
+  }
+
+  .activity-stat-label {
+    font-size: 0.62rem;
+  }
+
+  .activity-stat-value {
+    font-size: 0.68rem;
+  }
+
+  .activity-repo-name,
+  .activity-repo-prefix {
+    font-size: 0.6rem;
+  }
+
+  .activity-repo-lang {
+    font-size: 0.54rem;
+  }
+
+  .heatmap-wrapper {
+    --heatmap-cell-size: 10px;
+    --heatmap-gap: 3px;
+    --heatmap-month-gap: 4px;
+  }
+
+  .heatmap-scroll-nav {
+    display: none;
   }
 
   .heatmap-panel {

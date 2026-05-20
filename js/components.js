@@ -1,55 +1,11 @@
 /**
- * Component Loader
- * Fetches HTML partials from /components/ and injects them into
- * placeholder elements in index.html. After all components load,
- * dispatches 'components-loaded' so main.js can safely init.
+ * Component Loader (v3 — inlined)
+ *
+ * All component HTML is now inlined directly in index.html for instant
+ * rendering with zero layout shift. This script simply fires the
+ * 'components-loaded' event so main.js initializers run at the right time.
  */
 
-var componentMap = [
-  { id: 'comp-header',        path: './components/header.html' },
-  { id: 'comp-about',         path: './components/about.html' },
-  { id: 'comp-skills',        path: './components/skills.html' },
-  { id: 'comp-contributions', path: './components/contributions.html' },
-  { id: 'comp-projects',      path: './components/projects.html' },
-  { id: 'comp-achievements',  path: './components/achievements.html' },
-  { id: 'comp-meme',          path: './components/meme.html' },
-  { id: 'comp-contact',       path: './components/contact.html' },
-  { id: 'comp-footer',        path: './components/footer.html' }
-];
-var COMPONENT_VERSION = (function () {
-  var script = document.currentScript;
-  if (!script) return String(Date.now());
-
-  try {
-    return new URL(script.src, window.location.href).searchParams.get('v') || String(Date.now());
-  } catch (_) {
-    return String(Date.now());
-  }
-})();
-
-function loadComponent(entry) {
-  return fetch(entry.path + '?v=' + encodeURIComponent(COMPONENT_VERSION), { cache: 'no-store' })
-    .then(function (res) {
-      if (!res.ok) throw new Error('Failed to load ' + entry.path);
-      return res.text();
-    })
-    .then(function (html) {
-      var el = document.getElementById(entry.id);
-      if (el) el.innerHTML = html;
-      return { id: entry.id, ok: true };
-    })
-    .catch(function (err) {
-      var el = document.getElementById(entry.id);
-      if (el) {
-        el.innerHTML = '<p class="component-fallback" role="status">Unable to load this section.</p>';
-      }
-      console.error(err);
-      return { id: entry.id, ok: false };
-    });
-}
-
 document.addEventListener('DOMContentLoaded', function () {
-  Promise.all(componentMap.map(loadComponent)).then(function () {
-    document.dispatchEvent(new Event('components-loaded'));
-  });
+  document.dispatchEvent(new Event('components-loaded'));
 });

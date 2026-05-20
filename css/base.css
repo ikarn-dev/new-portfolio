@@ -62,7 +62,13 @@ body {
   padding: 40px 20px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background 0.3s, color 0.3s;
+}
+
+/* Only transition colors during an active theme change to avoid
+   continuous transition recalculation during normal scroll paints */
+body.theme-transitioning,
+body.theme-transitioning * {
+  transition: background 0.3s, color 0.3s, border-color 0.3s;
 }
 
 .sr-only {
