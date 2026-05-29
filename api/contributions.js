@@ -6,105 +6,22 @@ var LEVEL_MAP = {
   FOURTH_QUARTILE: 4
 };
 
-var GITHUB_LOGINS = ['ikarn-dev', 'Karan-OffPay'];
-
-/**
- * Build a GraphQL query with aliases for multiple users.
- * e.g. user0: user(login: "ikarn-dev") { ... }
- *      user1: user(login: "Karan-OffPay") { ... }
- */
-function buildQuery(logins) {
-  var fragments = logins.map(function (login, i) {
-    return [
-      '  user' + i + ': user(login: "' + login + '") {',
-      '    contributionsCollection(from: $from, to: $to) {',
-      '      contributionCalendar {',
-      '        totalContributions',
-      '        weeks { contributionDays { contributionCount contributionLevel date } }',
-      '      }',
-      '      totalCommitContributions',
-      '      totalPullRequestContributions',
-      '      totalPullRequestReviewContributions',
-      '      totalIssueContributions',
-      '    }',
-      '  }'
-    ].join('\n');
-  });
-
-  return 'query($from: DateTime!, $to: DateTime!) {\n' + fragments.join('\n') + '\n}';
-}
-
-var CONTRIBUTIONS_QUERY = buildQuery(GITHUB_LOGINS);
-
-/**
- * Merge contribution data from multiple users.
- * - Heatmap: sum counts per day, take max level
- * - Stats: sum all counters
- */
-function mergeContributions(users) {
-  var dayMap = {};
-  var totalContributions = 0;
-  var stats = { commits: 0, pullRequests: 0, reviews: 0, issues: 0 };
-
-  users.forEach(function (user) {
-    if (!user) return;
-    var collection = user.contributionsCollection;
-    var calendar = collection.contributionCalendar;
-
-    totalContributions += calendar.totalContributions;
-    stats.commits += collection.totalCommitContributions;
-    stats.pullRequests += collection.totalPullRequestContributions;
-    stats.reviews += collection.totalPullRequestReviewContributions;
-    stats.issues += collection.totalIssueContributions;
-
-    calendar.weeks.forEach(function (week) {
-      week.contributionDays.forEach(function (day) {
-        var level = LEVEL_MAP[day.contributionLevel] || 0;
-        if (dayMap[day.date]) {
-          dayMap[day.date].count += day.contributionCount;
-          if (level > dayMap[day.date].level) {
-            dayMap[day.date].level = level;
-          }
-        } else {
-          dayMap[day.date] = {
-            count: day.contributionCount,
-            level: level,
-            date: day.date
-          };
-        }
-      });
-    });
-  });
-
-  // Rebuild weeks structure from merged dayMap
-  var sortedDays = Object.keys(dayMap).sort().map(function (date) { return dayMap[date]; });
-
-  // Recalculate levels based on merged counts
-  var maxCount = 0;
-  sortedDays.forEach(function (d) { if (d.count > maxCount) maxCount = d.count; });
-  if (maxCount > 0) {
-    sortedDays.forEach(function (d) {
-      var ratio = d.count / maxCount;
-      if (d.count === 0) d.level = 0;
-      else if (ratio <= 0.25) d.level = 1;
-      else if (ratio <= 0.50) d.level = 2;
-      else if (ratio <= 0.75) d.level = 3;
-      else d.level = 4;
-    });
-  }
-
-  // Group into weeks (7 days each)
-  var weeks = [];
-  for (var i = 0; i < sortedDays.length; i += 7) {
-    weeks.push(sortedDays.slice(i, i + 7));
-  }
-
-  return {
-    totalContributions: totalContributions,
-    weeks: weeks,
-    stats: stats
-  };
-}
+var CONTRIBUTIONS_QUERY = [
+  'query($login: String!, $from: DateTime!, $to: DateTime!) {',
+  '  user(login: $login) {',
+  '    contributionsCollection(from: $from, to: $to) {',
+  '      contributionCalendar {',
+  '        totalContributions',
+  '        weeks { contributionDays { contributionCount contributionLevel date } }',
+  '      }',
+  '      totalCommitContributions',
+  '      totalPullRequestContributions',
+  '      totalPullRequestReviewContributions',
+  '      totalIssueContributions',
+  '    }',
+  '  }',
+  '}'
+].join('\n');
 
 module.exports = async function handler(req, res) {
   var year = parseInt(req.query.year, 10);
@@ -133,7 +50,11 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         query: CONTRIBUTIONS_QUERY,
-        variables: { from: from, to: to }
+        variables: {
+          login: 'ikarn-dev',
+          from: from,
+          to: to
+        }
       })
     });
 
@@ -144,25 +65,33 @@ module.exports = async function handler(req, res) {
 
     var json = await response.json();
 
-    if (json.errors || !json.data) {
+    if (json.errors || !json.data || !json.data.user) {
       res.status(502).json({ error: 'github_query_error' });
       return;
     }
 
-    // Collect all user results (skip null users — e.g. if account doesn't exist)
-    var users = GITHUB_LOGINS.map(function (_, i) {
-      return json.data['user' + i] || null;
-    }).filter(Boolean);
-
-    if (users.length === 0) {
-      res.status(502).json({ error: 'no_user_data' });
-      return;
-    }
-
-    var merged = mergeContributions(users);
+    var collection = json.data.user.contributionsCollection;
+    var calendar = collection.contributionCalendar;
 
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
-    res.status(200).json(merged);
+    res.status(200).json({
+      totalContributions: calendar.totalContributions,
+      weeks: calendar.weeks.map(function (week) {
+        return week.contributionDays.map(function (day) {
+          return {
+            count: day.contributionCount,
+            level: LEVEL_MAP[day.contributionLevel] || 0,
+            date: day.date
+          };
+        });
+      }),
+      stats: {
+        commits: collection.totalCommitContributions,
+        pullRequests: collection.totalPullRequestContributions,
+        reviews: collection.totalPullRequestReviewContributions,
+        issues: collection.totalIssueContributions
+      }
+    });
   } catch (_) {
     res.status(502).json({ error: 'github_fetch_failed' });
   }
