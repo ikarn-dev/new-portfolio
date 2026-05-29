@@ -97,24 +97,23 @@ function initProjectFilters() {
  */
 var heatmapState = { activeYear: null, requestId: 0 };
 var CACHE_TTL = 3600000;
-var GITHUB_LOGIN = 'ikarn-dev';
+var GITHUB_LOGINS = ['ikarn-dev', 'Karan-OffPay'];
 var LEVEL_MAP = { NONE: 0, FIRST_QUARTILE: 1, SECOND_QUARTILE: 2, THIRD_QUARTILE: 3, FOURTH_QUARTILE: 4 };
-var CONTRIBUTIONS_QUERY = [
-  'query($login: String!, $from: DateTime!, $to: DateTime!) {',
-  '  user(login: $login) {',
-  '    contributionsCollection(from: $from, to: $to) {',
-  '      contributionCalendar {',
-  '        totalContributions',
-  '        weeks { contributionDays { contributionCount contributionLevel date } }',
-  '      }',
-  '      totalCommitContributions',
-  '      totalPullRequestContributions',
-  '      totalPullRequestReviewContributions',
-  '      totalIssueContributions',
-  '    }',
-  '  }',
-  '}'
-].join('\n');
+var CONTRIBUTIONS_QUERY = 'query($from: DateTime!, $to: DateTime!) {\n' +
+  GITHUB_LOGINS.map(function (login, i) {
+    return '  user' + i + ': user(login: "' + login + '") {\n' +
+      '    contributionsCollection(from: $from, to: $to) {\n' +
+      '      contributionCalendar {\n' +
+      '        totalContributions\n' +
+      '        weeks { contributionDays { contributionCount contributionLevel date } }\n' +
+      '      }\n' +
+      '      totalCommitContributions\n' +
+      '      totalPullRequestContributions\n' +
+      '      totalPullRequestReviewContributions\n' +
+      '      totalIssueContributions\n' +
+      '    }\n' +
+      '  }';
+  }).join('\n') + '\n}';
 var twitterScriptPromise = null;
 
 function getCacheKey(year) { return 'gh_contrib_' + year; }
@@ -158,26 +157,59 @@ function getLocalGitHubToken() {
 }
 
 function normalizeContributionData(json) {
-  var collection = json.data.user.contributionsCollection;
-  var calendar = collection.contributionCalendar;
+  var dayMap = {};
+  var totalContributions = 0;
+  var stats = { commits: 0, pullRequests: 0, reviews: 0, issues: 0 };
+
+  GITHUB_LOGINS.forEach(function (_, i) {
+    var user = json.data['user' + i];
+    if (!user) return;
+    var collection = user.contributionsCollection;
+    var calendar = collection.contributionCalendar;
+
+    totalContributions += calendar.totalContributions;
+    stats.commits += collection.totalCommitContributions;
+    stats.pullRequests += collection.totalPullRequestContributions;
+    stats.reviews += collection.totalPullRequestReviewContributions;
+    stats.issues += collection.totalIssueContributions;
+
+    calendar.weeks.forEach(function (week) {
+      week.contributionDays.forEach(function (day) {
+        var level = LEVEL_MAP[day.contributionLevel] || 0;
+        if (dayMap[day.date]) {
+          dayMap[day.date].count += day.contributionCount;
+          if (level > dayMap[day.date].level) dayMap[day.date].level = level;
+        } else {
+          dayMap[day.date] = { count: day.contributionCount, level: level, date: day.date };
+        }
+      });
+    });
+  });
+
+  // Recalculate levels based on merged counts
+  var sortedDays = Object.keys(dayMap).sort().map(function (d) { return dayMap[d]; });
+  var maxCount = 0;
+  sortedDays.forEach(function (d) { if (d.count > maxCount) maxCount = d.count; });
+  if (maxCount > 0) {
+    sortedDays.forEach(function (d) {
+      var r = d.count / maxCount;
+      if (d.count === 0) d.level = 0;
+      else if (r <= 0.25) d.level = 1;
+      else if (r <= 0.50) d.level = 2;
+      else if (r <= 0.75) d.level = 3;
+      else d.level = 4;
+    });
+  }
+
+  var weeks = [];
+  for (var i = 0; i < sortedDays.length; i += 7) {
+    weeks.push(sortedDays.slice(i, i + 7));
+  }
 
   return {
-    totalContributions: calendar.totalContributions,
-    weeks: calendar.weeks.map(function (week) {
-      return week.contributionDays.map(function (day) {
-        return {
-          count: day.contributionCount,
-          level: LEVEL_MAP[day.contributionLevel] || 0,
-          date: day.date
-        };
-      });
-    }),
-    stats: {
-      commits: collection.totalCommitContributions,
-      pullRequests: collection.totalPullRequestContributions,
-      reviews: collection.totalPullRequestReviewContributions,
-      issues: collection.totalIssueContributions
-    }
+    totalContributions: totalContributions,
+    weeks: weeks,
+    stats: stats
   };
 }
 
@@ -210,7 +242,6 @@ function fetchBrowserContributions(year, token) {
     body: JSON.stringify({
       query: CONTRIBUTIONS_QUERY,
       variables: {
-        login: GITHUB_LOGIN,
         from: from,
         to: to
       }
@@ -225,7 +256,7 @@ function fetchBrowserContributions(year, token) {
       return res.json();
     })
     .then(function (json) {
-      if (json.errors || !json.data || !json.data.user) {
+      if (json.errors || !json.data) {
         throw new Error('GitHub query error');
       }
       return normalizeContributionData(json);
@@ -521,40 +552,52 @@ function timeAgo(isoDate) {
 var ACTIVITY_CACHE_KEY = 'gh_activity';
 var ACTIVITY_CACHE_TTL = 1800000; // 30 minutes
 
-var ACTIVITY_QUERY = [
-  'query($login: String!) {',
-  '  user(login: $login) {',
-  '    contributionsCollection {',
-  '      contributionCalendar { totalContributions }',
-  '      totalCommitContributions',
-  '    }',
-  '    repositories(first: 6, orderBy: {field: PUSHED_AT, direction: DESC}, ownerAffiliations: OWNER, isFork: false, privacy: PUBLIC) {',
-  '      nodes {',
-  '        name',
-  '        nameWithOwner',
-  '        description',
-  '        url',
-  '        pushedAt',
-  '        primaryLanguage { name color }',
-  '        stargazerCount',
-  '      }',
-  '    }',
-  '    pinnedItems(first: 6, types: REPOSITORY) {',
-  '      nodes {',
-  '        ... on Repository {',
-  '          name',
-  '          nameWithOwner',
-  '          description',
-  '          url',
-  '          pushedAt',
-  '          primaryLanguage { name color }',
-  '          stargazerCount',
-  '        }',
-  '      }',
-  '    }',
-  '  }',
-  '}'
-].join('\n');
+var ACTIVITY_QUERY = 'query {\n' +
+  GITHUB_LOGINS.map(function (login, i) {
+    return '  user' + i + ': user(login: "' + login + '") {\n' +
+      '    contributionsCollection {\n' +
+      '      contributionCalendar { totalContributions }\n' +
+      '      totalCommitContributions\n' +
+      '    }\n' +
+      '    repositories(first: 6, orderBy: {field: PUSHED_AT, direction: DESC}, ownerAffiliations: OWNER, isFork: false, privacy: PUBLIC) {\n' +
+      '      nodes {\n' +
+      '        name\n' +
+      '        nameWithOwner\n' +
+      '        description\n' +
+      '        url\n' +
+      '        pushedAt\n' +
+      '        primaryLanguage { name color }\n' +
+      '        stargazerCount\n' +
+      '      }\n' +
+      '    }\n' +
+      '    pinnedItems(first: 6, types: REPOSITORY) {\n' +
+      '      nodes {\n' +
+      '        ... on Repository {\n' +
+      '          name\n' +
+      '          nameWithOwner\n' +
+      '          description\n' +
+      '          url\n' +
+      '          pushedAt\n' +
+      '          primaryLanguage { name color }\n' +
+      '          stargazerCount\n' +
+      '        }\n' +
+      '      }\n' +
+      '    }\n' +
+      '  }';
+  }).join('\n') + '\n}';
+
+function mapRepoObj(repo) {
+  return {
+    name: repo.name,
+    fullName: repo.nameWithOwner,
+    description: repo.description || '',
+    url: repo.url,
+    language: repo.primaryLanguage ? repo.primaryLanguage.name : null,
+    languageColor: repo.primaryLanguage ? repo.primaryLanguage.color : null,
+    stars: repo.stargazerCount,
+    pushedAt: repo.pushedAt
+  };
+}
 
 function getCachedActivity() {
   try {
@@ -599,38 +642,50 @@ function fetchActivityFromBrowser(token) {
       'Authorization': 'Bearer ' + token,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      query: ACTIVITY_QUERY,
-      variables: { login: GITHUB_LOGIN }
-    })
+    body: JSON.stringify({ query: ACTIVITY_QUERY })
   })
     .then(function (res) {
       if (!res.ok) throw new Error('GitHub API error');
       return res.json();
     })
     .then(function (json) {
-      if (json.errors || !json.data || !json.data.user) throw new Error('GitHub query error');
-      var user = json.data.user;
-      var recentRepos = user.repositories.nodes || [];
-      var pinnedRepos = user.pinnedItems.nodes || [];
-      var displayRepos = pinnedRepos.length > 0 ? pinnedRepos : recentRepos;
+      if (json.errors || !json.data) throw new Error('GitHub query error');
+
+      var totalCommits = 0;
+      var totalContributions = 0;
+      var lastCommit = null;
+      var allRecentRepos = [];
+      var allPinnedRepos = [];
+
+      GITHUB_LOGINS.forEach(function (_, i) {
+        var user = json.data['user' + i];
+        if (!user) return;
+
+        totalCommits += user.contributionsCollection.totalCommitContributions;
+        totalContributions += user.contributionsCollection.contributionCalendar.totalContributions;
+
+        var recentRepos = user.repositories.nodes || [];
+        var pinnedRepos = user.pinnedItems.nodes || [];
+        recentRepos.forEach(function (r) { allRecentRepos.push(r); });
+        pinnedRepos.forEach(function (r) { allPinnedRepos.push(r); });
+
+        if (recentRepos.length > 0) {
+          var pushed = recentRepos[0].pushedAt;
+          if (!lastCommit || pushed > lastCommit) lastCommit = pushed;
+        }
+      });
+
+      allRecentRepos.sort(function (a, b) {
+        return new Date(b.pushedAt) - new Date(a.pushedAt);
+      });
+
+      var displayRepos = allPinnedRepos.length > 0 ? allPinnedRepos : allRecentRepos;
 
       return {
-        lastCommit: recentRepos.length > 0 ? recentRepos[0].pushedAt : null,
-        totalCommits: user.contributionsCollection.totalCommitContributions,
-        totalContributions: user.contributionsCollection.contributionCalendar.totalContributions,
-        repos: displayRepos.map(function (repo) {
-          return {
-            name: repo.name,
-            fullName: repo.nameWithOwner,
-            description: repo.description || '',
-            url: repo.url,
-            language: repo.primaryLanguage ? repo.primaryLanguage.name : null,
-            languageColor: repo.primaryLanguage ? repo.primaryLanguage.color : null,
-            stars: repo.stargazerCount,
-            pushedAt: repo.pushedAt
-          };
-        })
+        lastCommit: lastCommit,
+        totalCommits: totalCommits,
+        totalContributions: totalContributions,
+        repos: displayRepos.slice(0, 6).map(mapRepoObj)
       };
     });
 }
