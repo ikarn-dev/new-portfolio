@@ -96,7 +96,7 @@ function initProjectFilters() {
  * - Smart tooltip positioning to avoid edge cropping
  */
 var heatmapState = { activeYear: null, requestId: 0 };
-var CACHE_TTL = 3600000;
+var CACHE_TTL = 300000;
 var GITHUB_LOGIN = 'ikarn-dev';
 var LEVEL_MAP = { NONE: 0, FIRST_QUARTILE: 1, SECOND_QUARTILE: 2, THIRD_QUARTILE: 3, FOURTH_QUARTILE: 4 };
 var CONTRIBUTIONS_QUERY = [
@@ -117,7 +117,7 @@ var CONTRIBUTIONS_QUERY = [
 ].join('\n');
 var twitterScriptPromise = null;
 
-function getCacheKey(year) { return 'gh_contrib_' + year; }
+function getCacheKey(year) { return 'gh_contrib_' + (year || 'rolling'); }
 
 function getCachedData(year) {
   try {
@@ -182,7 +182,9 @@ function normalizeContributionData(json) {
 }
 
 function fetchServerContributions(year) {
-  return fetch('/api/contributions?year=' + year, {
+  var url = '/api/contributions';
+  if (year) url += '?year=' + year;
+  return fetch(url, {
     headers: {
       'Accept': 'application/json'
     }
@@ -255,9 +257,8 @@ function fetchContributions(year) {
 
 /* Prefetch — fires immediately on script load, before DOM ready */
 (function () {
-  var y = new Date().getFullYear();
-  if (!getCachedData(y)) {
-    fetchContributions(y).catch(function () {});
+  if (!getCachedData()) {
+    fetchContributions().catch(function () {});
   }
 })();
 
@@ -265,8 +266,7 @@ function initGitHubHeatmap() {
   var container = document.getElementById('github-heatmap');
   if (!container) return;
 
-  var currentYear = new Date().getFullYear();
-  loadContributions(currentYear);
+  loadContributions();
 }
 
 
@@ -519,7 +519,7 @@ function timeAgo(isoDate) {
  * GitHub Activity — last commit, total commits, recent repos
  */
 var ACTIVITY_CACHE_KEY = 'gh_activity';
-var ACTIVITY_CACHE_TTL = 1800000; // 30 minutes
+var ACTIVITY_CACHE_TTL = 300000; // 5 minutes
 
 var ACTIVITY_QUERY = [
   'query($login: String!) {',

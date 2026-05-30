@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       };
     });
 
-    res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=86400');
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
     res.status(200).json({
       lastCommit: lastPushedAt,
       totalCommits: collection.totalCommitContributions,
