@@ -528,7 +528,7 @@ var ACTIVITY_QUERY = [
   '      contributionCalendar { totalContributions }',
   '      totalCommitContributions',
   '    }',
-  '    repositories(first: 6, orderBy: {field: PUSHED_AT, direction: DESC}, ownerAffiliations: OWNER, isFork: false, privacy: PUBLIC) {',
+  '    repositories(first: 6, orderBy: {field: PUSHED_AT, direction: DESC}, ownerAffiliations: [OWNER, ORGANIZATION_MEMBER], isFork: false, privacy: PUBLIC) {',
   '      nodes {',
   '        name',
   '        nameWithOwner',
