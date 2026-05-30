@@ -117,7 +117,7 @@ var CONTRIBUTIONS_QUERY = [
 ].join('\n');
 var twitterScriptPromise = null;
 
-function getCacheKey(year) { return 'gh_contrib_' + (year || 'rolling'); }
+function getCacheKey(year) { return 'gh_contrib_' + year; }
 
 function getCachedData(year) {
   try {
@@ -182,9 +182,7 @@ function normalizeContributionData(json) {
 }
 
 function fetchServerContributions(year) {
-  var url = '/api/contributions';
-  if (year) url += '?year=' + year;
-  return fetch(url, {
+  return fetch('/api/contributions?year=' + year, {
     headers: {
       'Accept': 'application/json'
     }
@@ -257,8 +255,9 @@ function fetchContributions(year) {
 
 /* Prefetch — fires immediately on script load, before DOM ready */
 (function () {
-  if (!getCachedData()) {
-    fetchContributions().catch(function () {});
+  var y = new Date().getFullYear();
+  if (!getCachedData(y)) {
+    fetchContributions(y).catch(function () {});
   }
 })();
 
@@ -266,7 +265,8 @@ function initGitHubHeatmap() {
   var container = document.getElementById('github-heatmap');
   if (!container) return;
 
-  loadContributions();
+  var currentYear = new Date().getFullYear();
+  loadContributions(currentYear);
 }
 
 

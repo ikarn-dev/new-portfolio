@@ -24,29 +24,21 @@ var CONTRIBUTIONS_QUERY = [
 ].join('\n');
 
 module.exports = async function handler(req, res) {
+  var year = parseInt(req.query.year, 10);
+  var currentYear = new Date().getUTCFullYear();
+
+  if (!year || year < 2022 || year > currentYear) {
+    res.status(400).json({ error: 'invalid_year' });
+    return;
+  }
+
   if (!process.env.GITHUB_TOKEN) {
     res.status(503).json({ error: 'missing_config' });
     return;
   }
 
-  // Default: rolling last 365 days (matches GitHub profile)
-  var now = new Date();
-  var to = now.toISOString();
-  var fromDate = new Date(now);
-  fromDate.setFullYear(fromDate.getFullYear() - 1);
-  var from = fromDate.toISOString();
-
-  // Optional: pass ?year=2025 to get a specific calendar year
-  var year = parseInt(req.query.year, 10);
-  if (year) {
-    var currentYear = now.getUTCFullYear();
-    if (year < 2022 || year > currentYear) {
-      res.status(400).json({ error: 'invalid_year' });
-      return;
-    }
-    from = year + '-01-01T00:00:00Z';
-    to = year + '-12-31T23:59:59Z';
-  }
+  var from = year + '-01-01T00:00:00Z';
+  var to = year + '-12-31T23:59:59Z';
 
   try {
     var response = await fetch('https://api.github.com/graphql', {
